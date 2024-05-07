@@ -68,7 +68,7 @@ def like_post():
         return jsonify({'error': 'User or post not found'}), 404
 
 @app.route('/remove_like', methods=['POST'])
-def remove_like():
+def remove_like():#
     data = request.json
     username = data.get('username')
     post_id = data.get('post_id')
