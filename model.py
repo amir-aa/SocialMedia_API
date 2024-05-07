@@ -42,6 +42,19 @@ class Comment(Model):
     class Meta:
         database = db
 
+class Hashtag(Model):
+    name = CharField(unique=True)
+
+    class Meta:
+        database = db
+
+class PostHashtag(Model):
+    post = ForeignKeyField(Post)
+    hashtag = ForeignKeyField(Hashtag)
+
+    class Meta:
+        database = db
+    
 # Create tables
 db.connect()
 db.create_tables([User, Friendship, Post, Like, Comment])

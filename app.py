@@ -19,6 +19,16 @@ def add_friend():
     except User.DoesNotExist:
         return jsonify({'error': 'User not found'}), 404
 
+@app.route('/get_friends/<string:username>', methods=['GET'])
+def get_friends(username):
+    try:
+        user = User.get(User.username == username)
+        friends = [friendship.user2.username for friendship in user.friends]
+        return jsonify({'username': username, 'friends': friends})
+    except User.DoesNotExist:
+        return jsonify({'error': 'User not found'}), 404
+
+
 @app.route('/remove_friend', methods=['POST'])
 def remove_friend():
     data = request.json
@@ -38,13 +48,23 @@ def send_post():
     data = request.json
     username = data.get('username')
     content = data.get('content')
+
     try:
         user = User.get(User.username == username)
-        Post.create(user=user, content=content)
+        post = Post.create(user=user, content=content)
+
+        # Extract hashtags from the content
+        hashtags = re.findall(r'#(\w+)', content)
+        for tag in hashtags:
+            # Create or get the hashtag from the database
+            hashtag, created = Hashtag.get_or_create(name=tag.lower())
+
+            # Associate the hashtag with the post
+            PostHashtag.create(post=post, hashtag=hashtag)
+
         return jsonify({'message': 'Post sent successfully'})
     except User.DoesNotExist:
         return jsonify({'error': 'User not found'}), 404
-
 @app.route('/remove_post/<int:post_id>', methods=['DELETE'])
 def remove_post(post_id):
     try:
@@ -94,6 +114,42 @@ def fetch_posts():
         }
         posts.append(post_data)
     return jsonify(posts)
+
+@app.route('/search_posts_by_hashtag/<string:hashtag>', methods=['GET'])
+def search_posts_by_hashtag(hashtag):
+    try:
+        hashtag_obj = Hashtag.get(Hashtag.name == hashtag.lower())
+        posts = []
+        for post_hashtag in hashtag_obj.post_set:
+            post_data = {
+                'id': post_hashtag.post.id,
+                'content': post_hashtag.post.content,
+                'created_at': post_hashtag.post.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+                'user': post_hashtag.post.user.username
+            }
+            posts.append(post_data)
+        return jsonify({'hashtag': hashtag, 'posts': posts})
+    except Hashtag.DoesNotExist:
+        return jsonify({'error': 'Hashtag not found'}), 404
+
+@app.route('/fetch_user_posts/<string:username>', methods=['GET'])
+def fetch_user_posts(username):
+    try:
+        user = User.get(User.username == username)
+        posts = []
+        for post in user.posts:
+            post_data = {
+                'id': post.id,
+                'content': post.content,
+                'created_at': post.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+                'likes_count': post.likes.count(),
+                'comments': [{'username': comment.user.username, 'content': comment.content, 'created_at': comment.created_at.strftime('%Y-%m-%d %H:%M:%S')} for comment in post.comments],
+                'hashtags': [hashtag.hashtag.name for hashtag in post.posthashtag_set]
+            }
+            posts.append(post_data)
+        return jsonify(posts)
+    except User.DoesNotExist:
+        return jsonify({'error': 'User not found'}), 404
 
 if __name__ == '__main__':
     app.run(debug=True)
